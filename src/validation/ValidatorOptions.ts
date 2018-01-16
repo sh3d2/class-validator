@@ -9,6 +9,11 @@ export interface ValidatorOptions {
     skipMissingProperties?: boolean;
 
     /**
+     * If set to true validator will skip remaining checks after one fails
+     */
+    skipOnFail?: boolean;
+
+    /**
      * Groups to be used during validation of the object.
      */
     groups?: string[];

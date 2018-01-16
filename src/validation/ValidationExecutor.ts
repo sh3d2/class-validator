@@ -44,33 +44,35 @@ export class ValidationExecutor {
         const targetMetadatas = this.metadataStorage.getTargetValidationMetadatas(object.constructor, targetSchema, groups);
         const groupedMetadatas = this.metadataStorage.groupByPropertyName(targetMetadatas);
 
-        Object.keys(groupedMetadatas).forEach(propertyName => {
-            const value = (object as any)[propertyName];
-            const definedMetadatas = groupedMetadatas[propertyName].filter(metadata => metadata.type === ValidationTypes.IS_DEFINED);
-            const metadatas = groupedMetadatas[propertyName].filter(metadata => metadata.type !== ValidationTypes.IS_DEFINED);
-            const customValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.CUSTOM_VALIDATION);
-            const nestedValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.NESTED_VALIDATION);
-            const conditionalValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.CONDITIONAL_VALIDATION);
+        Object
+            .keys(groupedMetadatas)
+            .forEach(propertyName => {
+                const value = (object as any)[propertyName];
+                const definedMetadatas = groupedMetadatas[propertyName].filter(metadata => metadata.type === ValidationTypes.IS_DEFINED);
+                const metadatas = groupedMetadatas[propertyName].filter(metadata => metadata.type !== ValidationTypes.IS_DEFINED);
+                const customValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.CUSTOM_VALIDATION);
+                const nestedValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.NESTED_VALIDATION);
+                const conditionalValidationMetadatas = metadatas.filter(metadata => metadata.type === ValidationTypes.CONDITIONAL_VALIDATION);
 
-            const validationError = this.generateValidationError(object, value, propertyName);
-            validationErrors.push(validationError);
+                const validationError = this.generateValidationError(object, value, propertyName);
+                validationErrors.push(validationError);
 
-            const canValidate = this.conditionalValidations(object, value, conditionalValidationMetadatas);
-            if (!canValidate) {
-                return;
-            }
+                const canValidate = this.conditionalValidations(object, value, conditionalValidationMetadatas);
+                if (!canValidate) {
+                    return;
+                }
 
-            // handle IS_DEFINED validation type the special way - it should work no matter skipMissingProperties is set or not
-            this.defaultValidations(object, value, definedMetadatas, validationError.constraints);
+                // handle IS_DEFINED validation type the special way - it should work no matter skipMissingProperties is set or not
+                this.defaultValidations(object, value, definedMetadatas, validationError.constraints);
 
-            if ((value === null || value === undefined) && this.validatorOptions && this.validatorOptions.skipMissingProperties === true) {
-                return;
-            }
+                if ((value === null || value === undefined) && this.validatorOptions && this.validatorOptions.skipMissingProperties === true) {
+                    return;
+                }
 
-            this.defaultValidations(object, value, metadatas, validationError.constraints);
-            this.customValidations(object, value, customValidationMetadatas, validationError.constraints);
-            this.nestedValidations(value, nestedValidationMetadatas, validationError.children);
-        });
+                this.defaultValidations(object, value, metadatas, validationError.constraints);
+                this.customValidations(object, value, customValidationMetadatas, validationError.constraints);
+                this.nestedValidations(value, nestedValidationMetadatas, validationError.children);
+            });
     }
 
     stripEmptyErrors(errors: ValidationError[]) {
@@ -129,15 +131,20 @@ export class ValidationExecutor {
                                value: any,
                                metadatas: ValidationMetadata[],
                                errorMap: { [key: string]: string }) {
+        const skipOnFail = this.validatorOptions ? this.validatorOptions.skipOnFail : false;
+        let hasError = false;
         return metadatas
+            .reverse()
             .filter(metadata => {
-                if (metadata.each) {
-                    if (value instanceof Array) {
-                        return !value.every((subValue: any) => this.validator.validateValueByMetadata(subValue, metadata));
-                    }
+                if (!hasError || skipOnFail === false) {
+                    if (metadata.each) {
+                        if (value instanceof Array) {
+                            return hasError = !value.every((subValue: any) => this.validator.validateValueByMetadata(subValue, metadata));
+                        }
 
-                } else {
-                    return !this.validator.validateValueByMetadata(value, metadata);
+                    } else {
+                        return hasError = !this.validator.validateValueByMetadata(value, metadata);
+                    }
                 }
             })
             .forEach(metadata => {
